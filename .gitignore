@@ -3,3 +3,4 @@ build
 npt-debug.log
 .env
 .DS_Store
+*.html

@@ -1,8 +1,6 @@
 const rp = require('request-promise');
 const cheerio = require('cheerio');
-const { appendFile } = require('fs');
-
-let challenges = [];
+const { appendFileSync } = require('fs');
 
 const options = {
     url: `https://www.freecodecamp.org/page-data/learn/page-data.json`,
@@ -11,52 +9,76 @@ const options = {
 
 rp(options)
     .then((data) => {
-        let edgeData = [];
+        let edges = [];
         for (let edge of data.result.data.allChallengeNode.edges) {
-            if (edge.node.block === `react`) {
-                edgeData.push({ slug: edge.node.fields.slug });
-            }
+            edges.push({
+                block: edge.node.block,
+                slug: edge.node.fields.slug,
+            });
         };
-        process.stdout.write('loading');
-        getChallenges(edgeData);
+        const blocks = getBlocks(edges);
+        blocks.forEach(block => {
+            writeChallenges(block, edges);
+        });
+        // writeChallenges('react', edges);
     })
     .catch((error) => {
         console.log(error);
     });
 
-function getChallenges(edgeData) {
+function getBlocks(edges) {
+    let blocks = [];
+    edges.forEach((edge) => {
+        if (!blocks.includes(edge.block)) {
+            blocks.push(edge.block);
+        }
+    });
+    return blocks;
+}
+
+function writeChallenges(block, edges) {
     let i = 0;
+    let challenges = [];
     function next() {
-        if (i < edgeData.length) {
-            let options = {
-                url: `https://www.freecodecamp.org/page-data` + edgeData[i].slug + `/page-data.json`,
-                json: true
+        if (i < edges.length) {
+            if (edges[i].block === block) {
+                let options = {
+                    url: `https://www.freecodecamp.org/page-data` + edges[i].slug + `/page-data.json`,
+                    json: true
+                }
+                console.log('Requesting', options.url);
+                rp(options)
+                    .then((data) => {
+                        let challenge = {
+                            title: data.result.data.challengeNode.title,
+                            description: data.result.data.challengeNode.description
+                        }
+                        challenges.push(challenge);
+                        i++;
+                        next();
+                    })
+                    .catch((error) => { console.log('Error', error) })
+            } else {
+                i++;
+                next();
             }
-            console.log(options.url);
-            rp(options)
-                .then((data) => {
-                    process.stdout.write(`.`);
-                    challenges.push({
-                        title: data.result.data.challengeNode.title,
-                        description: data.result.data.challengeNode.description
-                    });
-                    ++i;
-                    return next();
-                })
         } else {
-            writeData();
+            writeData(block, challenges);
         }
     }
     return next();
 }
 
-function writeData() {
+function writeData(block, challenges) {
     console.log('✅');
     challenges.forEach(challenge => {
-        appendFile(
-            'challenges.html',
-            `<h2>${challenge.title}</h2>\n${challenge.description}`,
-            () => console.log(`Wrote to file: ${challenge.title}`)
+        appendFileSync(
+            `${block}Challenges.html`,
+            `<h2>${challenge.title}</h2>\n${challenge.description}\n`
         )
     });
+    appendFileSync(
+        'index.html',
+        `<a href="${block}Challenges.html">${block}Challenges</a><br/>`
+    )
 }
