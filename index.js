@@ -11,7 +11,6 @@ rp(options)
     .then((data) => {
         let edges = getEdges(data);
         let challengePromises = getChallengePromises(edges);
-        console.log('#challengePromises', challengePromises.length);
         Promise.all(challengePromises)
             .then(writeHtml)
             .catch((error) => {
@@ -23,10 +22,29 @@ function writeHtml(challenges) {
     let lastBlockName = '';
     challenges.forEach(challenge => {
         let challengeNode = challenge.result.data.challengeNode;
-        appendFileSync(`${challengeNode.fields.blockName.replace(/\s+/g, '')}Challenges.html`, `<h2>${challengeNode.title}</h2>\n${challengeNode.description}\n`);
-        if (challengeNode.fields.blockName !== lastBlockName) {
-            appendFileSync('index.html', `<a href="${challengeNode.fields.blockName.replace(/\s+/g, '')}Challenges.html">${challengeNode.fields.blockName} Challenges</a><br/>\n`);
+        let blockName = challengeNode.fields.blockName;
+        if (blockName !== lastBlockName) {
+            appendFileSync(
+                'index.html',
+                `<a href="${blockName.replace(/\s+/g, '')}Challenges.html">${blockName} Challenges</a><br/>\n`);
+            appendFileSync(
+                `${blockName.replace(/\s+/g, '')}Challenges.html`,
+                `<script>\nfunction toggleVisibility(target) {\nlet instructionsElement = target.getElementsByTagName('div')[0];\ninstructionsElement.style.display = instructionsElement.style.display==='none'?'block':'none';\n}\n</script>`
+            )
         }
+        let challengeHtml = `<h2>${challengeNode.title}</h2>\n` +
+            `${challengeNode.description}\n`;
+        if (challengeNode.instructions) {
+            challengeHtml = challengeHtml +
+                `<div onclick="toggleVisibility(this)">Click to toggle instructions\n` +
+                `<div style="display: none">\n` +
+                `${challengeNode.instructions}\n` +
+                `</div>\n</div>\n`;
+        }
+        appendFileSync(
+            `${blockName.replace(/\s+/g, '')}Challenges.html`,
+            challengeHtml
+        );
         lastBlockName = challengeNode.fields.blockName;
     });
 }
